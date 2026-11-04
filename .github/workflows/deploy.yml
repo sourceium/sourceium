@@ -1,0 +1,67 @@
+name: 3D Point Cloud Pipeline & Cloud Deploy
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'photo.png'
+      - 'clay-front.png'
+      - 'clay-side.png'
+      - 'pipeline.py'
+      - 'index.html'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install opencv-python-headless onnxruntime scipy scikit-image numpy pillow requests
+
+      - name: Fetch Depth Anything V2 Small ONNX Model
+        run: |
+          mkdir -p models
+          curl -L -o models/depth_anything_v2_vits.onnx \
+            "https://huggingface.co/onnx-community/depth-anything-v2-small/resolve/main/onnx/model.onnx" || echo "Model download fallback ready"
+
+      - name: Run 3D Voxel Carving & Blue-Noise Sampling Pipeline
+        run: |
+          python pipeline.py
+
+      - name: Stage Artifacts for Production
+        run: |
+          mkdir -p dist
+          cp index.html dist/
+          cp dots.bin dist/
+          cp photo_cutout.png dist/
+          cp photo.png dist/ || true
+          cp vercel.json dist/
+
+      - name: Deploy to 'production' Branch (Zero Secrets Required)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: production
+          publish_dir: ./dist
+          force_orphan: true
+          user_name: 'github-actions[bot]'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
