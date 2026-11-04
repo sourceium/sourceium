@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>SOURCEIUM - Portfolio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #050507; font-family: 'Inter', sans-serif; color: #fff; }
+    #viewport-container { position: absolute; inset: 0; width: 100vw; height: 100vh; overflow: hidden; }
+    
+    #background-banner {
+      position: absolute; top: 48%; left: 50%; transform: translate(-50%, -50%);
+      width: 100vw; text-align: center; font-family: 'Anton', sans-serif;
+      font-size: min(22vw, 290px); letter-spacing: 0.08em; line-height: 0.85;
+      text-transform: uppercase; z-index: 1; pointer-events: none;
+      background: linear-gradient(180deg, rgba(200, 200, 205, 0.45) 0%, rgba(20, 20, 24, 0.08) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      transition: background 1.8s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    #background-banner.revealed {
+      background: linear-gradient(180deg, rgba(163, 9, 14, 0.85) 0%, rgba(10, 2, 4, 0.25) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+
+    #webgl-canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; display: block; }
+    #photo-reveal-layer {
+      position: absolute; inset: 0; z-index: 3; pointer-events: none; opacity: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #photo-reveal-layer img {
+      height: 112%; max-width: none; object-fit: cover; transform: translateY(-2%);
+      mask-image: radial-gradient(circle at center, black 100%, transparent 100%);
+      -webkit-mask-image: radial-gradient(circle at center, black 100%, transparent 100%);
+    }
+    #grain-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 5; opacity: 0.045; mix-blend-mode: overlay; }
+    #ui-container { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); z-index: 10; }
+    
+    .action-btn {
+      appearance: none; background: rgba(18, 18, 22, 0.75); border: 1px solid rgba(163, 9, 14, 0.5);
+      color: #dedede; padding: 12px 34px; font-size: 13px; font-weight: 600; letter-spacing: 0.18em;
+      text-transform: uppercase; border-radius: 999px; cursor: pointer; backdrop-filter: blur(12px);
+      transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.6), inset 0 0 12px rgba(163,9,14,0.2);
+    }
+    .action-btn:hover {
+      background: rgba(163, 9, 14, 0.85); color: #fff; border-color: rgba(255, 60, 70, 0.8);
+      box-shadow: 0 10px 40px rgba(163,9,14,0.45); transform: translateY(-2px);
+    }
+
+    #loader {
+      position: absolute; inset: 0; z-index: 20; background: #050507;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      transition: opacity 0.8s ease;
+    }
+    .ring-svg { width: 140px; height: 140px; transform: rotate(-90deg); }
+    .ring-bg { fill: none; stroke: #160305; stroke-width: 3.5; }
+    .ring-bar {
+      fill: none; stroke: #a3090e; stroke-width: 3.5; stroke-linecap: round;
+      stroke-dasharray: 377; stroke-dashoffset: 377; transition: stroke-dashoffset 0.1s ease-out;
+    }
+    .loader-percentage { position: absolute; font-size: 20px; font-weight: 600; color: #a3090e; font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body>
+  <div id="viewport-container">
+    <div id="background-banner">SOURCEIUM</div>
+    <canvas id="webgl-canvas"></canvas>
+    <div id="photo-reveal-layer">
+      <img id="portrait-photo" src="photo_cutout.png" onerror="this.src='photo.png'" alt="Portrait" />
+    </div>
+    <canvas id="grain-overlay"></canvas>
+    <div id="ui-container">
+      <button id="toggle-reveal-btn" class="action-btn">Reveal</button>
+    </div>
+    <div id="loader">
+      <svg class="ring-svg">
+        <circle class="ring-bg" cx="70" cy="70" r="60" />
+        <circle id="loader-progress-ring" class="ring-bar" cx="70" cy="70" r="60" />
+      </svg>
+      <div id="loader-text" class="loader-percentage">0%</div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    // 1. Film Grain
+    const grainCanvas = document.getElementById('grain-overlay');
+    const gctx = grainCanvas.getContext('2d');
+    function resizeGrain() { grainCanvas.width = window.innerWidth / 2; grainCanvas.height = window.innerHeight / 2; }
+    resizeGrain();
+    function renderGrain() {
+      const w = grainCanvas.width, h = grainCanvas.height;
+      if (w > 0 && h > 0) {
+        const idata = gctx.createImageData(w, h);
+        const buffer = new Uint32Array(idata.data.buffer);
+        for (let i = 0; i < buffer.length; i++) {
+          if (Math.random() < 0.12) {
+            const gray = (Math.random() * 255) | 0;
+            buffer[i] = (255 << 24) | (gray << 16) | (gray << 8) | gray;
+          }
+        }
+        gctx.putImageData(idata, 0, 0);
+      }
+      requestAnimationFrame(renderGrain);
+    }
+    renderGrain();
+
+    // 2. Three.js Scene Setup with Orthographic Camera (~12% larger than fit-to-height)
+    const frustumSize = 2.45;
+    const aspect = window.innerWidth / window.innerHeight;
+    const camera = new THREE.OrthographicCamera(-frustumSize * aspect / 2, frustumSize * aspect / 2, frustumSize / 2, -frustumSize / 2, 0.1, 100);
+    camera.position.set(0, 0, 10);
+
+    const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('webgl-canvas'), alpha: true, antialias: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+    const scene = new THREE.Scene();
+    const bustGroup = new THREE.Group();
+    const headGroup = new THREE.Group();
+    bustGroup.add(headGroup);
+    scene.add(bustGroup);
+    bustGroup.position.set(0, -0.06, 0);
+
+    // 3. Shaders
+    const dotVertexShader = `
+      attribute vec3 aTarget; attribute vec3 aNormal; attribute float aRandom; attribute float aBrightness;
+      uniform float uProgress, uSweepY, uFlatten, uTime;
+      varying vec3 vNormal, vWorldPos;
+      varying float vBrightness, vSweepHit, vFlatten;
+      void main() {
+        float p = smoothstep(0.0, 1.0, clamp(uProgress * 1.4 - aRandom * 0.35, 0.0, 1.0));
+        vec3 curPos = mix(position, aTarget, p);
+        curPos.z = mix(curPos.z, 0.0, uFlatten);
+        curPos.y += sin(uTime * 1.5 + aRandom * 6.28) * 0.003 * (1.0 - uFlatten);
+        vec4 mvPosition = modelViewMatrix * vec4(curPos, 1.0);
+        gl_Position = projectionMatrix * mvPosition;
+        gl_PointSize = mix(2.4, 4.2, aRandom) * (1.0 - uFlatten * 0.55);
+        vNormal = normalMatrix * aNormal;
+        vWorldPos = curPos;
+        vBrightness = aBrightness;
+        vFlatten = uFlatten;
+        vSweepHit = smoothstep(0.24, 0.0, abs(curPos.y - uSweepY));
+      }
+    `;
+
+    const dotFragmentShader = `
+      uniform vec3 uBaseColor; uniform vec2 uCursor; uniform float uTime;
+      varying vec3 vNormal, vWorldPos;
+      varying float vBrightness, vSweepHit, vFlatten;
+      void main() {
+        vec2 uv = gl_PointCoord - vec2(0.5);
+        float d = length(uv);
+        if (d > 0.5) discard;
+        float alpha = smoothstep(0.5, 0.12, d);
+        vec3 norm = normalize(vNormal);
+        float key = max(dot(norm, normalize(vec3(0.5, 0.7, 0.8))), 0.0);
+        float rim = pow(1.0 - max(dot(norm, vec3(0.0, 0.0, 1.0)), 0.0), 2.2);
+        vec3 cursorLightDir = normalize(vec3(uCursor * 1.5 - vWorldPos.xy, 0.6));
+        float cursorLight = max(dot(norm, cursorLightDir), 0.0) * 1.4;
+        vec3 col = uBaseColor * vBrightness + vec3(0.35, 0.05, 0.08) * (key * 0.9 + rim * 0.6) + vec3(0.65, 0.12, 0.18) * cursorLight;
+        col += vec3(0.85, 0.25, 0.3) * vSweepHit * 1.8;
+        gl_FragColor = vec4(col, alpha * mix(0.88, 0.0, vFlatten));
+      }
+    `;
+
+    const dotUniforms = {
+      uProgress: { value: 0.0 }, uSweepY: { value: -99.0 }, uFlatten: { value: 0.0 },
+      uCursor: { value: new THREE.Vector2(0, 0) }, uBaseColor: { value: new THREE.Color(0.64, 0.035, 0.055) },
+      uTime: { value: 0.0 }
+    };
+
+    // 4. Ambient Dust
+    const DUST_COUNT = 380;
+    const dustGeo = new THREE.BufferGeometry();
+    const dustPos = new Float32Array(DUST_COUNT * 3);
+    const dustSpeed = new Float32Array(DUST_COUNT * 3);
+    for (let i = 0; i < DUST_COUNT; i++) {
+      dustPos[i*3] = (Math.random()-0.5)*4.0; dustPos[i*3+1] = (Math.random()-0.5)*3.0; dustPos[i*3+2] = (Math.random()-0.5)*2.0;
+      dustSpeed[i*3] = (Math.random()-0.5)*0.0006; dustSpeed[i*3+1] = 0.0004 + Math.random()*0.0008; dustSpeed[i*3+2] = (Math.random()-0.5)*0.0006;
+    }
+    dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
+    scene.add(new THREE.Points(dustGeo, new THREE.PointsMaterial({ color: 0xaa2233, size: 1.8, transparent: true, opacity: 0.38, blending: THREE.AdditiveBlending })));
+
+    // 5. Binary Loader & Procedural Fallback Engine
+    const loaderRing = document.getElementById('loader-progress-ring');
+    const loaderText = document.getElementById('loader-text');
+    let bustArrived = false, arrivalStartTime = 0;
+
+    function setPreloader(pct) {
+      loaderRing.style.strokeDashoffset = 377 - (pct / 100) * 377;
+      loaderText.innerText = Math.round(pct) + '%';
+    }
+
+    async function loadDataAndInit() {
+      try {
+        const response = await fetch('./dots.bin');
+        if (!response.ok) throw new Error('dots.bin not generated yet');
+        const contentLength = +response.headers.get('Content-Length') || 2500000;
+        const reader = response.body.getReader();
+        let received = 0;
+        let chunks = [];
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(value);
+          received += value.length;
+          setPreloader(Math.min(99, (received / contentLength) * 100));
+        }
+        let allChunks = new Uint8Array(received);
+        let pos = 0;
+        for (let c of chunks) { allChunks.set(c, pos); pos += c.length; }
+        initPointGeometry(allChunks.buffer);
+      } catch (err) {
+        console.warn('Using procedural generator fallback:', err);
+        let pct = 0;
+        let t = setInterval(() => {
+          pct += 12;
+          setPreloader(Math.min(100, pct));
+          if (pct >= 100) { clearInterval(t); initProceduralPoints(); }
+        }, 50);
+      }
+    }
+
+    function initPointGeometry(arrayBuffer) {
+      const view = new DataView(arrayBuffer);
+      const count = view.getUint32(0, true);
+      const pos = new Float32Array(count * 3), tgt = new Float32Array(count * 3);
+      const nrm = new Float32Array(count * 3), rnd = new Float32Array(count), brt = new Float32Array(count);
+      let byteOffset = 4;
+      for (let i = 0; i < count; i++) {
+        tgt[i*3]   = view.getFloat32(byteOffset, true);
+        tgt[i*3+1] = view.getFloat32(byteOffset + 4, true);
+        tgt[i*3+2] = view.getFloat32(byteOffset + 8, true);
+        nrm[i*3]   = view.getFloat32(byteOffset + 12, true);
+        nrm[i*3+1] = view.getFloat32(byteOffset + 16, true);
+        nrm[i*3+2] = view.getFloat32(byteOffset + 20, true);
+        rnd[i]     = view.getFloat32(byteOffset + 24, true);
+        brt[i]     = view.getFloat32(byteOffset + 28, true);
+        byteOffset += 32;
+
+        const ang = (i / count) * Math.PI * 2;
+        pos[i*3] = Math.cos(ang) * 0.42; pos[i*3+1] = Math.sin(ang) * 0.42; pos[i*3+2] = (Math.random()-0.5)*0.05;
+      }
+      buildMesh(pos, tgt, nrm, rnd, brt);
+    }
+
+    function initProceduralPoints() {
+      const N = 78000;
+      const pos = new Float32Array(N*3), tgt = new Float32Array(N*3), nrm = new Float32Array(N*3), rnd = new Float32Array(N), brt = new Float32Array(N);
+      for(let i=0; i<N; i++) {
+        let y = (Math.random()*1.7)-0.85, rx=0.4, rz=0.4;
+        if (y > 0.05) { rx = Math.sqrt(Math.max(0, 1.0 - Math.pow(((y-0.05)/0.8)-0.5, 2)))*0.5 + 0.08; rz = rx * 1.05; }
+        else if (y > -0.22) { rx = 0.28; rz = 0.26; }
+        else { rx = 0.32 + Math.pow(1.0 - (y+0.85)/0.63, 1.6)*0.78; rz = 0.28; }
+        let phi = (Math.random()*0.95 - 0.475) * Math.PI;
+        tgt[i*3] = rx * Math.sin(phi) * 1.08; tgt[i*3+1] = y * 1.08 + 0.02; tgt[i*3+2] = rz * Math.cos(phi) * 1.08;
+        nrm[i*3] = tgt[i*3]/rx; nrm[i*3+1] = 0.0; nrm[i*3+2] = tgt[i*3+2]/rz;
+        const ang = (i / N) * Math.PI * 2;
+        pos[i*3] = Math.cos(ang) * 0.42; pos[i*3+1] = Math.sin(ang) * 0.42; pos[i*3+2] = 0;
+        rnd[i] = Math.random(); brt[i] = 0.75;
+      }
+      buildMesh(pos, tgt, nrm, rnd, brt);
+    }
+
+    function buildMesh(pos, tgt, nrm, rnd, brt) {
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      geo.setAttribute('aTarget', new THREE.BufferAttribute(tgt, 3));
+      geo.setAttribute('aNormal', new THREE.BufferAttribute(nrm, 3));
+      geo.setAttribute('aRandom', new THREE.BufferAttribute(rnd, 1));
+      geo.setAttribute('aBrightness', new THREE.BufferAttribute(brt, 1));
+      const mat = new THREE.ShaderMaterial({
+        vertexShader: dotVertexShader, fragmentShader: dotFragmentShader, uniforms: dotUniforms,
+        transparent: true, blending: THREE.AdditiveBlending, depthTest: false
+      });
+      headGroup.add(new THREE.Points(geo, mat));
+
+      setPreloader(100);
+      setTimeout(() => {
+        document.getElementById('loader').style.opacity = '0';
+        setTimeout(() => document.getElementById('loader').style.display = 'none', 800);
+        bustArrived = true;
+        arrivalStartTime = performance.now();
+        setTimeout(() => { sweepActive = true; sweepStart = performance.now(); }, 1100);
+      }, 400);
+    }
+
+    // 6. Interaction & Reveal Transition
+    const mouse = { x: 0, y: 0, tx: 0, ty: 0, moved: false };
+    window.addEventListener('mousemove', (e) => {
+      mouse.moved = true;
+      mouse.tx = (e.clientX / window.innerWidth) * 2 - 1;
+      mouse.ty = -(e.clientY / window.innerHeight) * 2 + 1;
+    });
+
+    let sweepActive = false, sweepStart = 0;
+    let isRevealed = false, revealActive = false, revealStartTime = 0;
+    const revealBtn = document.getElementById('toggle-reveal-btn');
+    const photoLayer = document.getElementById('photo-reveal-layer');
+    const banner = document.getElementById('background-banner');
+
+    revealBtn.addEventListener('click', () => {
+      if (revealActive) return;
+      isRevealed = !isRevealed; revealActive = true; revealStartTime = performance.now();
+      revealBtn.innerText = isRevealed ? 'Back to dots' : 'Reveal';
+      banner.classList.toggle('revealed', isRevealed);
+    });
+
+    // 7. Render Loop
+    const clock = new THREE.Clock();
+    function animate() {
+      requestAnimationFrame(animate);
+      const time = clock.getElapsedTime(), now = performance.now();
+
+      // Dust
+      const d = dustGeo.attributes.position.array;
+      for (let i = 0; i < DUST_COUNT; i++) {
+        d[i*3+1] += dustSpeed[i*3+1];
+        if (d[i*3+1] > 1.6) d[i*3+1] = -1.6;
+      }
+      dustGeo.attributes.position.needsUpdate = true;
+
+      // Arrival
+      if (bustArrived) dotUniforms.uProgress.value = Math.min(1.0, (now - arrivalStartTime) / 1250);
+
+      // Light Sweep
+      if (sweepActive) {
+        const sp = (now - sweepStart) / 1400;
+        if (sp <= 1.0) dotUniforms.uSweepY.value = 0.9 - sp * 1.85;
+        else { sweepActive = false; dotUniforms.uSweepY.value = -99.0; }
+      }
+
+      // 3.6s Reveal Transition
+      if (revealActive) {
+        let p = Math.min(1.0, (now - revealStartTime) / 3600);
+        if (!isRevealed) p = 1.0 - p;
+        const eased = p < 0.5 ? 2*p*p : 1 - Math.pow(-2*p + 2, 2) / 2;
+        dotUniforms.uSweepY.value = 1.0 - p * 2.1;
+        dotUniforms.uFlatten.value = eased;
+        photoLayer.style.opacity = eased.toString();
+        const m = eased * 145;
+        photoLayer.style.webkitMaskImage = `radial-gradient(circle at 50% 50%, black ${m}%, transparent ${m+25}%)`;
+        photoLayer.style.maskImage = `radial-gradient(circle at 50% 50%, black ${m}%, transparent ${m+25}%)`;
+        if ((isRevealed && p >= 1.0) || (!isRevealed && p <= 0.0)) {
+          revealActive = false;
+          if (!isRevealed) { photoLayer.style.opacity = '0'; dotUniforms.uSweepY.value = -99.0; }
+        }
+      }
+
+      // Tracking & Lissajous Drift
+      if (isRevealed && !revealActive) {
+        headGroup.rotation.y += (0 - headGroup.rotation.y) * 0.08;
+        headGroup.rotation.x += (0 - headGroup.rotation.x) * 0.08;
+        bustGroup.rotation.y += (0 - bustGroup.rotation.y) * 0.08;
+      } else {
+        let ry = Math.sin(time * 0.6) * 0.06, rx = Math.cos(time * 0.45) * 0.035;
+        if (mouse.moved) {
+          mouse.x += (mouse.tx - mouse.x) * 0.065;
+          mouse.y += (mouse.ty - mouse.y) * 0.065;
+          ry = mouse.x * 0.48; rx = -mouse.y * 0.35;
+        }
+        headGroup.rotation.y += (ry - headGroup.rotation.y) * 0.08;
+        headGroup.rotation.x += (rx - headGroup.rotation.x) * 0.08;
+        bustGroup.rotation.y += (ry * 0.28 - bustGroup.rotation.y) * 0.04;
+        dotUniforms.uCursor.value.set(mouse.x, mouse.y);
+      }
+
+      dotUniforms.uTime.value = time;
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+      const w = window.innerWidth, h = window.innerHeight, asp = w / h;
+      camera.left = -frustumSize * asp / 2; camera.right = frustumSize * asp / 2;
+      camera.top = frustumSize / 2; camera.bottom = -frustumSize / 2;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+      resizeGrain();
+    });
+
+    loadDataAndInit();
+  </script>
+</body>
+</html>
