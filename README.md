@@ -23,13 +23,13 @@
 
 ## About me
 
-I'm a developer, creator and gamer from India. I write my code with AI agents: I tell them what to build, read what they produce, test it and ship it. Android apps are what I'm making day to day right now.
+I'm a developer, creator and gamer from India. I write my code with AI agents: I tell them what to build, read what they produce, test it and ship it. Android apps are what I'm making day to day right now, and I build websites and web apps too.
 
-- 🔭 **Working on:** Android apps, built together with AI agents
+- 🔭 **Working on:** Android apps and websites, built together with AI agents
 - 🤝 **Collaborating:** looking to team up on Android projects. Bring an idea and let's talk
 - 🙋 **Looking for help:** from anyone. I learn fastest from other people, so advice is always welcome
 - 🌱 **Learning:** everything. Code, design, video and games all feed into each other
-- 💬 **Ask me about:** my projects, AI-agent workflows, Android and games
+- 💬 **Ask me about:** my projects, AI-agent workflows, websites, Android and games
 - ⚡ **Fun fact:** I'm a creator, a developer and a gamer
 
 ## How I build with AI agents
@@ -53,13 +53,14 @@ I'm a developer, creator and gamer from India. I write my code with AI agents: I
 ## Tech stack
 
 <p align="center">
-  <img src="https://skillicons.dev/icons?i=kotlin,java,dart,flutter,firebase,py,php,flask,astro,tailwind,bootstrap,wordpress,aws,gcp,cloudflare,netlify,vercel,supabase,mysql,sqlite,git,github,gitlab,figma,ps,pr,lr,unity,unreal,raspberrypi&perline=10" alt="Tech stack icons">
+  <img src="https://skillicons.dev/icons?i=html,css,js,ts,kotlin,java,dart,flutter,firebase,py,php,flask,astro,tailwind,bootstrap,wordpress,aws,gcp,cloudflare,netlify,vercel,supabase,mysql,sqlite,git,github,gitlab,figma,ps,pr,lr,unity,unreal,raspberrypi&perline=10" alt="Tech stack icons">
 </p>
 
 | Area | Tools |
 | :--- | :--- |
 | **Android toolkit** | Kotlin, Java, Dart, Flutter, Gradle, Firebase |
-| **Languages** | Dart, Java, Kotlin, PHP, Python |
+| **Web development** | HTML, CSS, JavaScript, TypeScript, PHP, Python, SQL |
+| **Languages** | Kotlin, Java, Dart, JavaScript, TypeScript, PHP, Python, SQL |
 | **Frameworks and front end** | Flutter, Flask, Astro, Bootstrap, Tailwind CSS, WordPress |
 | **Cloud and hosting** | AWS, Google Cloud, Cloudflare, Firebase, Netlify, Vercel, Render |
 | **Databases** | MySQL, MariaDB, SQLite, Supabase |
