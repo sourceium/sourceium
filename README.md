@@ -71,9 +71,10 @@ I'm a developer, creator and gamer from India. I write my code with AI agents: I
 ## GitHub stats
 
 <p align="center">
-  <img height="170" src="https://github-readme-stats.vercel.app/api?username=SOURCEIUM&show_icons=true&hide_border=true&bg_color=0e0e10&title_color=ff4a52&icon_color=ff7a3d&text_color=d4d4da" alt="SOURCEIUM GitHub stats">
-  <img height="170" src="https://github-readme-stats.vercel.app/api/top-langs/?username=SOURCEIUM&layout=compact&hide_border=true&bg_color=0e0e10&title_color=ff4a52&text_color=d4d4da" alt="Most used languages">
+  <img height="170" src="https://ghstats.dev/api/card?username=sourceium&hide_title=true&border_radius=0&custom_title=SOURCEIUM&size=compact" alt="SOURCEIUM GitHub stats">
+  <img height="170" src="https://github-readme-stats-fast.vercel.app/api/top-langs/?username=SOURCEIUM&layout=compact&hide_border=true&bg_color=0e0e10&title_color=ff4a52&text_color=d4d4da" alt="Most used languages">
 </p>
+
 
 ## Find me online
 
